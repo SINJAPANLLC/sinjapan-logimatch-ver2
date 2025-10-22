@@ -1,0 +1,377 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite用: ENUMの代わりにStringを使用
+// UserType: "SHIPPER" (荷主) | "CARRIER" (運送会社)
+// ShipmentStatus: "OPEN" (募集中) | "MATCHED" (マッチング済み) | "IN_TRANSIT" (輸送中) | "DELIVERED" (配達完了) | "CANCELLED" (キャンセル)
+// OfferStatus: "PENDING" (保留中) | "ACCEPTED" (承認済み) | "REJECTED" (拒否) | "CANCELLED" (キャンセル)
+// VehicleType: "LIGHT_TRUCK" | "SMALL_TRUCK" | "MEDIUM_TRUCK" | "LARGE_TRUCK" | "TRAILER" | "REFRIGERATED" | "FLATBED" | "WING"
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  password      String
+  userType      String      // "SHIPPER" or "CARRIER"
+  companyName   String
+  contactPerson String
+  phone         String
+  postalCode    String?
+  address       String?
+  
+  // 認証・承認
+  isAdmin       Boolean     @default(false)
+  verificationStatus String  @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  trustScore    Float       @default(5.0) // 信用スコア（1.0～5.0）
+  
+  // 詳細情報
+  industry      String?     // 業種
+  establishedDate DateTime? // 設立日
+  capital       Float?      // 資本金
+  employeeCount Int?        // 従業員数
+  businessDescription String? // 事業内容
+  
+  // 契約内容
+  subscriptionPlan String?  // 契約プラン
+  contractStartDate DateTime? // 契約開始日
+  contractEndDate DateTime? // 契約終了日
+  
+  // 口座情報
+  bankName      String?     // 銀行名
+  branchName    String?     // 支店名
+  accountType   String?     // 口座種別（普通/当座）
+  accountNumber String?     // 口座番号
+  accountHolder String?     // 口座名義
+  
+  // お支払い方法
+  paymentMethod String?     // 支払い方法（クレジットカード/銀行振込/口座振替）
+  billingAddress String?    // 請求先住所
+  
+  // 請求書設定
+  invoiceReceiptEmail String? // 請求書受領メール
+  invoiceReceiptMethod String? // 受領方法（メール/郵送/システム内）
+  invoiceIssueMethod String? // 発行方法（自動/手動）
+  invoiceCompanyName String? // 請求書宛名
+  
+  // 経理担当者
+  accountingPersonName String? // 経理担当者名
+  accountingPersonEmail String? // 経理担当者メール
+  accountingPersonPhone String? // 経理担当者電話
+  
+  // メール受信設定
+  emailNotificationShipment Boolean @default(true) // 荷物関連通知
+  emailNotificationOffer Boolean @default(true) // オファー関連通知
+  emailNotificationMatching Boolean @default(true) // マッチング通知
+  emailNotificationMessage Boolean @default(true) // メッセージ通知
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  shipments     Shipment[]  @relation("ShipperShipments")
+  offers        Offer[]
+  carrierShipments Shipment[] @relation("CarrierShipments")
+  vehicles      Vehicle[]
+  verifications Verification[]
+  ratingsGiven  Rating[]    @relation("RaterRatings")
+  ratingsReceived Rating[]  @relation("RatedUserRatings")
+  payments      Payment[]
+  
+  @@map("users")
+}
+
+model Shipment {
+  id                String          @id @default(cuid())
+  
+  // 荷主情報
+  shipperId         String
+  shipper           User            @relation("ShipperShipments", fields: [shipperId], references: [id])
+  
+  // 荷物情報
+  cargoName         String
+  cargoDescription  String?
+  cargoWeight       Float           // kg単位
+  cargoVolume       Float?          // m³単位
+  cargoValue        Float?          // 貨物価値（円）
+  
+  // 集荷情報
+  pickupAddress     String
+  pickupCity        String
+  pickupPrefecture  String
+  pickupPostalCode  String
+  pickupDate        DateTime
+  pickupTimeFrom    String?         // "09:00"形式
+  pickupTimeTo      String?         // "18:00"形式
+  
+  // 配送情報
+  deliveryAddress   String
+  deliveryCity      String
+  deliveryPrefecture String
+  deliveryPostalCode String
+  deliveryDate      DateTime
+  deliveryTimeFrom  String?
+  deliveryTimeTo    String?
+  
+  // 要求事項
+  requiredVehicleType String          // VehicleType as String
+  needsHelper       Boolean         @default(false) // 荷役作業の有無
+  needsLiftGate     Boolean         @default(false) // リフトゲート必須
+  temperature       String?         // 温度管理要件
+  specialInstructions String?
+  
+  // 料金
+  budget            Float           // 予算（円）
+  
+  // ステータス
+  status            String          @default("OPEN")
+  
+  // マッチング情報
+  carrierId         String?
+  carrier           User?           @relation("CarrierShipments", fields: [carrierId], references: [id])
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relations
+  offers            Offer[]
+  
+  @@map("shipments")
+  @@index([status])
+  @@index([pickupPrefecture])
+  @@index([deliveryPrefecture])
+  @@index([pickupDate])
+}
+
+model Offer {
+  id            String       @id @default(cuid())
+  
+  // オファー情報
+  shipmentId    String
+  shipment      Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  
+  carrierId     String
+  carrier       User         @relation(fields: [carrierId], references: [id])
+  
+  // 提案内容
+  proposedPrice Float        // 提案金額（円）
+  message       String?      // 運送会社からのメッセージ
+  vehicleInfo   String?      // 使用予定車両情報
+  estimatedPickupTime String? // 集荷予定時刻
+  estimatedDeliveryTime String? // 配達予定時刻
+  
+  // ステータス
+  status        String       @default("PENDING")
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  @@map("offers")
+  @@index([shipmentId])
+  @@index([carrierId])
+  @@index([status])
+}
+
+model Vehicle {
+  id                String          @id @default(cuid())
+  
+  // 運送会社情報
+  carrierId         String
+  carrier           User            @relation(fields: [carrierId], references: [id])
+  
+  // 車両基本情報
+  vehicleType       String          // 車両タイプ
+  vehicleNumber     String          // 車両番号
+  driverName        String          // 運転手名
+  driverPhone       String          // 運転手電話番号
+  
+  // 車両仕様
+  maxWeight         Float           // 最大積載重量（kg）
+  maxVolume         Float?          // 最大積載容積（m³）
+  length            Float?          // 車両長（m）
+  width             Float?          // 車両幅（m）
+  height            Float?          // 車両高（m）
+  
+  // 設備・機能
+  hasLiftGate       Boolean         @default(false) // リフトゲート有無
+  hasRefrigeration  Boolean         @default(false) // 冷凍・冷蔵機能
+  hasTemperatureControl Boolean     @default(false) // 温度管理機能
+  canLoadUnload     Boolean         @default(true)  // 荷役作業可能
+  
+  // 運行可能エリア
+  availablePrefectures String       // 運行可能都道府県（JSON配列として保存）
+  
+  // 運行可能日時
+  availableFrom     DateTime        // 運行可能開始日時
+  availableTo       DateTime        // 運行可能終了日時
+  
+  // 料金設定
+  basePrice         Float?          // 基本料金（円/km）
+  minPrice          Float?          // 最低料金（円）
+  
+  // ステータス
+  status            String          @default("AVAILABLE") // "AVAILABLE" | "IN_USE" | "MAINTENANCE" | "UNAVAILABLE"
+  
+  // 備考
+  notes             String?         // 備考・特記事項
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@map("vehicles")
+  @@index([carrierId])
+  @@index([vehicleType])
+  @@index([status])
+  @@index([availableFrom])
+  @@index([availableTo])
+}
+
+model Verification {
+  id            String       @id @default(cuid())
+  
+  // ユーザー情報
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 許可証情報
+  documentType  String       // "BUSINESS_LICENSE" | "TRANSPORT_LICENSE" | "INSURANCE" | "OTHER"
+  documentUrl   String?      // アップロードされた書類のURL
+  documentNumber String?     // 許可証番号
+  issueDate     DateTime?    // 発行日
+  expiryDate    DateTime?    // 有効期限
+  
+  // ステータス
+  status        String       @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  rejectionReason String?    // 却下理由
+  
+  // 審査情報
+  reviewedBy    String?      // 審査したAdmin ID
+  reviewedAt    DateTime?    // 審査日時
+  
+  submittedAt   DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  @@map("verifications")
+  @@index([userId])
+  @@index([status])
+}
+
+model Rating {
+  id            String       @id @default(cuid())
+  
+  // 評価対象ユーザー
+  ratedUserId   String
+  ratedUser     User         @relation("RatedUserRatings", fields: [ratedUserId], references: [id], onDelete: Cascade)
+  
+  // 評価したユーザー
+  raterUserId   String
+  rater         User         @relation("RaterRatings", fields: [raterUserId], references: [id], onDelete: Cascade)
+  
+  // 評価内容
+  score         Int          // 評価スコア（1～5）
+  comment       String?      // コメント
+  
+  // 関連取引
+  shipmentId    String?      // 関連する配送ID（オプション）
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  @@map("ratings")
+  @@index([ratedUserId])
+  @@index([raterUserId])
+  @@unique([ratedUserId, raterUserId, shipmentId]) // 同じ取引に対して1回のみ評価可能
+}
+
+model Payment {
+  id            String       @id @default(cuid())
+  
+  // ユーザー情報
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 決済情報
+  amount        Float        // 決済金額（円）
+  paymentMethod String       // "bank_transfer" | "card" | "direct_debit"
+  paymentStatus String       @default("PENDING") // "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED"
+  
+  // 取引詳細
+  transactionId String?      // 外部決済システムの取引ID（Square、会費ペイなど）
+  description   String?      // 決済の説明
+  
+  // メタデータ
+  metadata      String?      // JSON形式の追加情報
+  
+  // 決済完了日時
+  paidAt        DateTime?    // 決済完了日時
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  @@map("payments")
+  @@index([userId])
+  @@index([paymentStatus])
+  @@index([paymentMethod])
+}
+
+model Notification {
+  id            String       @id @default(cuid())
+  
+  // 通知内容
+  title         String       // 通知タイトル
+  message       String       // 通知本文
+  type          String       @default("INFO") // "INFO" | "WARNING" | "SUCCESS" | "ERROR"
+  
+  // 配信設定
+  targetType    String       // "ALL" | "SHIPPER" | "CARRIER" | "SPECIFIC_USER"
+  targetUserId  String?      // 個別通知の場合の対象ユーザーID
+  
+  // ステータス
+  sentByEmail   Boolean      @default(false) // メール送信済みフラグ
+  
+  // 作成者情報
+  createdBy     String       // 作成した管理者ID
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Relations
+  receipts      NotificationReceipt[]
+  
+  @@map("notifications")
+  @@index([targetType])
+  @@index([targetUserId])
+  @@index([createdAt])
+}
+
+model NotificationReceipt {
+  id              String       @id @default(cuid())
+  
+  // 通知とユーザーの関連
+  notificationId  String
+  notification    Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  
+  userId          String
+  
+  // ユーザーごとのステータス
+  isRead          Boolean      @default(false) // 既読フラグ
+  isDeleted       Boolean      @default(false) // 削除フラグ
+  
+  readAt          DateTime?    // 既読日時
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  @@map("notification_receipts")
+  @@unique([notificationId, userId]) // 通知とユーザーのペアは一意
+  @@index([userId])
+  @@index([isRead])
+  @@index([isDeleted])
+}
+
