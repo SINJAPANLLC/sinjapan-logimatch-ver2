@@ -46,6 +46,10 @@ export async function POST(request: NextRequest) {
     if (!documentType) {
       return NextResponse.json({ error: '書類タイプを選択してください' }, { status: 400 })
     }
+    
+    if (!documentUrl) {
+      return NextResponse.json({ error: '書類ファイルをアップロードしてください' }, { status: 400 })
+    }
 
     const verification = await prisma.verification.create({
       data: {
