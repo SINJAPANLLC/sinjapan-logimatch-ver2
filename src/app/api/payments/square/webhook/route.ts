@@ -20,15 +20,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Webhook signature key not configured' }, { status: 500 })
     }
 
-    // Webhook署名を検証（静的メソッドとして呼び出し）
-    const url = request.url
-    
-    const isValid = WebhooksHelper.isValidWebhookEventSignature(
-      body,
-      signature,
-      webhookSignatureKey,
-      url
-    )
+    // Webhook署名を検証
+    const isValid = WebhooksHelper.verifySignature({
+      requestBody: body,
+      signatureHeader: signature,
+      signatureKey: webhookSignatureKey,
+      notificationUrl: request.url
+    })
 
     if (!isValid) {
       console.error('Invalid webhook signature')
