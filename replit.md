@@ -28,7 +28,8 @@ The platform is built on **Next.js 14 (App Router)** with **TypeScript**, utiliz
 - **Form Management**: React Hook Form, Zod
 - **Email Service**: Resend API (for contact form submissions)
 - **Payment Gateways**:
-    - Square Web Payments SDK (for card payments)
+    - **Stripe**: Complete integration with Payment Intent API and Webhook handling
+    - **Square**: Full Node.js SDK integration (v43+) with Payment API and Webhook verification
     - Kaihipay (for direct debit – integration ready)
 
 ## Recent Changes
@@ -53,3 +54,13 @@ The platform is built on **Next.js 14 (App Router)** with **TypeScript**, utiliz
 - ✅ Security hardening: Removed hardcoded JWT_SECRET fallback, now requires environment variable
 - ✅ Fixed TypeScript build errors (shipment budget→price property)
 - ✅ Optimized build script: Removed failing migrate deploy, using Prisma generate only
+
+### Payment System Integration (October 22, 2025)
+- ✅ **Stripe Integration**: Complete implementation with lazy-loaded client initialization to prevent build errors
+- ✅ **Square Integration**: Full Square Node.js SDK v43+ integration with:
+  - Payment creation API with idempotency protection (uses payment ID as key to prevent double-charging)
+  - Webhook handler with static method signature verification
+  - Sandbox/Production environment switching
+  - Complete payment lifecycle management
+- ✅ **Build Fix**: Fixed Resend client initialization to prevent build-time errors
+- ✅ **Architect Review**: All critical issues resolved (webhook static method call, idempotency key stability)
