@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyToken } from '@/lib/auth'
+import { getSquareClient } from '@/lib/square'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,55 +43,78 @@ export async function POST(
     }
 
     // Square決済処理
-    if (paymentMethod === 'card') {
-      const isProduction = process.env.NODE_ENV === 'production'
-      const squareAccessToken = isProduction
-        ? process.env.SQUARE_ACCESS_TOKEN
-        : process.env.SQUARE_SANDBOX_ACCESS_TOKEN
-
-      if (!squareAccessToken) {
-        return NextResponse.json({ error: 'Square設定が不完全です' }, { status: 500 })
+    if (paymentMethod === 'card' && sourceId) {
+      const square = getSquareClient()
+      
+      if (!square) {
+        return NextResponse.json({ error: 'Square設定が完了していません' }, { status: 500 })
       }
 
-      // Square Payments APIを使用して決済処理
-      // TODO: Square SDK統合（現在はデモ）
-      // const { Client, Environment } = require('square');
-      // const client = new Client({
-      //   accessToken: squareAccessToken,
-      //   environment: isProduction ? Environment.Production : Environment.Sandbox
-      // });
-      
-      // const response = await client.paymentsApi.createPayment({
-      //   sourceId: sourceId,
-      //   amountMoney: {
-      //     amount: Math.round(payment.amount),
-      //     currency: 'JPY'
-      //   },
-      //   idempotencyKey: paymentId
-      // });
+      try {
+        // Square Payments APIを使用して決済処理
+        // 冪等性キーとして決済IDを使用（重複課金を防ぐ）
+        const idempotencyKey = paymentId
+        
+        const response = await square.paymentsApi.createPayment({
+          sourceId: sourceId,
+          amountMoney: {
+            amount: BigInt(Math.round(payment.amount)),
+            currency: 'JPY'
+          },
+          idempotencyKey,
+          note: `Payment ID: ${paymentId} - ${payment.user.companyName}`
+        })
 
-      // デモ用：決済を完了としてマーク
-      const updatedPayment = await prisma.payment.update({
-        where: { id: paymentId },
-        data: {
-          paymentStatus: 'COMPLETED',
-          transactionId: `demo_${sourceId.substring(0, 16)}`,
-          paidAt: new Date(),
-          metadata: JSON.stringify({
-            sourceId,
-            environment: isProduction ? 'production' : 'sandbox'
+        if (response.result.payment) {
+          const squarePayment = response.result.payment
+          
+          // 決済情報を更新
+          const updatedPayment = await prisma.payment.update({
+            where: { id: paymentId },
+            data: {
+              paymentStatus: squarePayment.status === 'COMPLETED' ? 'COMPLETED' : 'PENDING',
+              transactionId: squarePayment.id!,
+              paidAt: squarePayment.status === 'COMPLETED' ? new Date() : null,
+              metadata: JSON.stringify({
+                squarePaymentId: squarePayment.id,
+                status: squarePayment.status,
+                receiptUrl: squarePayment.receiptUrl,
+                receiptNumber: squarePayment.receiptNumber,
+                orderId: squarePayment.orderId,
+              })
+            }
           })
-        }
-      })
 
-      return NextResponse.json({
-        message: '決済が完了しました',
-        data: {
-          paymentId: updatedPayment.id,
-          status: updatedPayment.paymentStatus,
-          amount: updatedPayment.amount
+          return NextResponse.json({
+            message: '決済が完了しました',
+            data: {
+              paymentId: updatedPayment.id,
+              status: updatedPayment.paymentStatus,
+              amount: updatedPayment.amount,
+              receiptUrl: squarePayment.receiptUrl,
+              receiptNumber: squarePayment.receiptNumber,
+            }
+          })
+        } else {
+          throw new Error('Square payment failed')
         }
-      })
+      } catch (squareError) {
+        console.error('Square payment error:', squareError)
+        
+        // エラー時は決済ステータスを更新
+        await prisma.payment.update({
+          where: { id: paymentId },
+          data: {
+            paymentStatus: 'FAILED',
+            metadata: JSON.stringify({
+              error: squareError instanceof Error ? squareError.message : 'Unknown error',
+              failedAt: new Date().toISOString(),
+            })
+          }
+        })
+        
+        throw squareError
+      }
     }
 
     return NextResponse.json({ error: '未対応の決済方法です' }, { status: 400 })
