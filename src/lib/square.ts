@@ -11,8 +11,8 @@ export function getSquareClient() {
   }
 
   return new SquareClient({
-    accessToken,
-    environment: environment === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
+    token: accessToken,
+    environment: environment === 'production' ? 'production' : 'sandbox',
   })
 }
 
