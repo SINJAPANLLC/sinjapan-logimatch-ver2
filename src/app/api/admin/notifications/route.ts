@@ -5,7 +5,15 @@ import { Resend } from 'resend'
 
 export const dynamic = 'force-dynamic'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Resendクライアントを遅延初期化
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.warn('RESEND_API_KEY is not set. Email notifications will be skipped.')
+    return null
+  }
+  return new Resend(apiKey)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,9 +64,13 @@ export async function POST(request: NextRequest) {
 
     // メール送信
     if (sendEmail) {
-      for (const user of targetUsers) {
-        try {
-          await resend.emails.send({
+      const resend = getResendClient()
+      if (!resend) {
+        console.warn('Resend client not available. Skipping email notifications.')
+      } else {
+        for (const user of targetUsers) {
+          try {
+            await resend.emails.send({
             from: 'SIN JAPAN LOGI MATCH <noreply@sinjapan.jp>',
             to: user.email,
             subject: `【SIN JAPAN LOGI MATCH】${title}`,
@@ -100,6 +112,7 @@ export async function POST(request: NextRequest) {
           })
         } catch (emailError) {
           console.error('Email send error:', emailError)
+          }
         }
       }
     }

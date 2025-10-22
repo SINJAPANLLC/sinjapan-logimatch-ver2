@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 export const dynamic = 'force-dynamic'
+
+// Resendクライアントを遅延初期化
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured')
+  }
+  return new Resend(apiKey)
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,6 +55,7 @@ ${message}
 このメールは SIN JAPAN LOGI MATCH のお問い合わせフォームから送信されました。
     `.trim()
 
+    const resend = getResendClient()
     const data = await resend.emails.send({
       from: 'SIN JAPAN LOGI MATCH <noreply@sinjapan.jp>',
       to: ['info@sinjapan.jp'],
