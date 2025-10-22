@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     // Square Paymentを作成
     const idempotencyKey = randomUUID()
     
-    const paymentResponse = await square.paymentsApi.createPayment({
+    const paymentResponse = await square.payments.create({
       sourceId,
       idempotencyKey,
       amountMoney: {
@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
       note: description || `${user.companyName}様のお支払い`,
     })
 
-    if (paymentResponse.result.payment) {
-      const squarePayment = paymentResponse.result.payment
+    if (paymentResponse.payment) {
+      const squarePayment = paymentResponse.payment
 
       // Payment レコードを作成
       const payment = await prisma.payment.create({

@@ -55,7 +55,7 @@ export async function POST(
         // 冪等性キーとして決済IDを使用（重複課金を防ぐ）
         const idempotencyKey = paymentId
         
-        const response = await square.paymentsApi.createPayment({
+        const response = await square.payments.create({
           sourceId: sourceId,
           amountMoney: {
             amount: BigInt(Math.round(payment.amount)),
@@ -65,8 +65,8 @@ export async function POST(
           note: `Payment ID: ${paymentId} - ${payment.user.companyName}`
         })
 
-        if (response.result.payment) {
-          const squarePayment = response.result.payment
+        if (response.payment) {
+          const squarePayment = response.payment
           
           // 決済情報を更新
           const updatedPayment = await prisma.payment.update({
