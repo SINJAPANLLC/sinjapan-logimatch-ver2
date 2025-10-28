@@ -38,3 +38,6 @@ next-env.d.ts
 *.sqlite
 *.db-journal
 
+# replit
+.local/
+
