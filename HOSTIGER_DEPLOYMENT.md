@@ -28,10 +28,15 @@ git push origin main
 ### 2. Hostigerでアプリケーション作成
 
 1. Hostingerにログイン
-2. 「Node.js」アプリケーションを作成
+2. **重要**: 「Node.js」アプリケーションを作成（PHPではないことを確認）
 3. 「GitHub」リポジトリと連携を選択
 4. リポジトリURLを入力: `https://github.com/SINJAPANLLC/sinjapan-logimatch-ver2.git`
 5. ブランチ: `main` を選択
+
+⚠️ **重要な注意事項**:
+- デプロイログで`composer.lock`や`composer.json`を探している場合、Hostingerが**PHPアプリケーション**として認識している可能性があります
+- この場合、Hostingerの設定でアプリケーションタイプを**Node.js**に変更する必要があります
+- アプリケーション作成時に「Node.js」を選択しているか再確認してください
 
 ### 3. 環境変数の設定
 
@@ -70,12 +75,41 @@ Hostigerのビルド設定で以下を設定：
 
 - **Build Command**: `npm run build`
 - **Start Command**: `npm start`
-- **Node.js Version**: 18.x または 20.x
+- **Node.js Version**: 18.x または 20.x（推奨: 20.x）
 - **Port**: 自動設定（環境変数`PORT`を使用）
 
 ⚠️ **重要**: 
 - ビルドコマンドとスタートコマンドが正しく設定されているか確認してください
 - 環境変数`PORT`が設定されているか確認してください（通常はHostingerが自動設定します）
+- アプリケーションタイプが**Node.js**になっているか確認してください（PHPではないことを確認）
+
+#### アプリケーションタイプの確認方法
+
+デプロイログに以下のようなメッセージが出る場合：
+```
+Looking for composer.lock file
+composer.lock file was not found
+Looking for composer.json file
+composer.json file was not found
+```
+
+これは、Hostingerが**PHPアプリケーション**として認識していることを示しています。
+
+**解決方法**:
+1. Hostingerのダッシュボードでアプリケーション設定を開く
+2. 「アプリケーションタイプ」または「Runtime」を確認
+3. 「Node.js」が選択されていることを確認
+4. PHPになっている場合は、「Node.js」に変更して保存
+5. 再度デプロイを実行
+
+正しいデプロイログには以下のようなメッセージが表示されるはずです：
+```
+Looking for package.json file
+package.json file was found
+Running npm install
+Running npm run build
+Running npm start
+```
 
 ### 5. デプロイの実行
 
