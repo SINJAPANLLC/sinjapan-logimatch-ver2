@@ -230,7 +230,55 @@ postgresql://username:password@hostname:port/database_name?schema=public
 - `NEXTAUTH_URL` (ドメインを含む完全なURL)
 - `PORT` (通常は自動設定)
 
-#### 8. ログの確認
+#### 8. SSH接続での確認（詳細な診断）
+
+SSHでサーバーに接続して、アプリケーションの状態を直接確認できます：
+
+```bash
+# SSH接続コマンド
+ssh u170935974@45.13.135.26 -p 65002
+
+# 接続後、以下を実行して確認：
+
+# 1. 現在のディレクトリとファイルを確認
+pwd
+ls -la
+
+# 2. Node.jsアプリケーションが実行中か確認
+ps aux | grep node
+ps aux | grep next
+
+# 3. ポートが使用されているか確認
+netstat -tulpn | grep :5000
+# または
+lsof -i :5000
+
+# 4. 環境変数を確認
+echo $DATABASE_URL
+echo $JWT_SECRET
+echo $NEXTAUTH_URL
+echo $PORT
+
+# 5. アプリケーションのログを確認（ログファイルの場所はHostingerの設定による）
+# 一般的な場所:
+ls -la logs/
+tail -f logs/app.log
+# または
+tail -f ~/logs/*.log
+
+# 6. アプリケーションを再起動する場合
+# （注意: Hostingerのダッシュボードから再起動する方が安全です）
+pm2 restart all
+# または
+npm start
+
+# 7. ディレクトリの権限を確認・修正
+ls -la
+chmod 755 .
+chmod 644 package.json
+```
+
+#### 9. ログの確認
 ```bash
 # SSHでアプリケーションディレクトリにアクセス
 # ログファイルを確認
