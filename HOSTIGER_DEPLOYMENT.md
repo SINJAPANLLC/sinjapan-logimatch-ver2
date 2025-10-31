@@ -6,15 +6,34 @@
 - PostgreSQLデータベース
 - GitHubアカウント
 
+## 🚀 デプロイフロー
+
+**基本的な流れ:**
+1. GitHubにコードをプッシュ
+2. HostingerでGitHubリポジトリと連携
+3. Hostingerで環境変数を設定
+4. Hostingerでビルドとスタートコマンドを設定
+5. Hostingerでデプロイを実行（自動または手動）
+
 ## 🚀 デプロイ手順
 
-### 1. Hostigerでアプリケーション作成
+### 1. GitHubへのプッシュ
 
-1. Hostigerにログイン
-2. Node.jsアプリケーションを作成
-3. GitHubリポジトリと連携: `https://github.com/SINJAPANLLC/sinjapan-logimatch-ver2.git`
+```bash
+git add .
+git commit -m "デプロイ準備完了"
+git push origin main
+```
 
-### 2. 環境変数の設定
+### 2. Hostigerでアプリケーション作成
+
+1. Hostingerにログイン
+2. 「Node.js」アプリケーションを作成
+3. 「GitHub」リポジトリと連携を選択
+4. リポジトリURLを入力: `https://github.com/SINJAPANLLC/sinjapan-logimatch-ver2.git`
+5. ブランチ: `main` を選択
+
+### 3. 環境変数の設定
 
 Hostigerの環境変数設定で以下を追加：
 
@@ -45,15 +64,40 @@ SQUARE_ACCESS_TOKEN=your_square_access_token
 SQUARE_APPLICATION_ID=your_square_app_id
 ```
 
-### 3. ビルド設定
+### 4. ビルド設定
 
 Hostigerのビルド設定で以下を設定：
 
 - **Build Command**: `npm run build`
 - **Start Command**: `npm start`
 - **Node.js Version**: 18.x または 20.x
+- **Port**: 自動設定（環境変数`PORT`を使用）
 
-### 4. データベースのセットアップ
+⚠️ **重要**: 
+- ビルドコマンドとスタートコマンドが正しく設定されているか確認してください
+- 環境変数`PORT`が設定されているか確認してください（通常はHostingerが自動設定します）
+
+### 5. デプロイの実行
+
+Hostingerで以下のいずれかを実行：
+- **自動デプロイ**: GitHubにプッシュすると自動的にデプロイが開始される場合があります
+- **手動デプロイ**: Hostingerのダッシュボードから「デプロイ」ボタンをクリック
+
+デプロイが完了するまで数分かかります。
+
+### 7. デプロイ後の確認
+
+デプロイが完了したら、以下を確認：
+
+1. **アプリケーションのステータス**
+   - Hostingerのダッシュボードで、アプリケーションが「実行中」になっているか確認
+   - ログビューアーでエラーがないか確認
+
+2. **URLアクセステスト**
+   - ドメイン（`https://sinjapan-logimatch.com`）にアクセス
+   - 403エラーが出る場合は、以下のトラブルシューティングを参照
+
+### 8. データベースのセットアップ
 
 デプロイ後、HostigerのTerminalまたはSSHで以下を実行：
 
@@ -65,7 +109,7 @@ npm run db:push
 npm run create:admin
 ```
 
-### 5. 管理者アカウント情報
+### 9. 管理者アカウント情報
 
 作成される管理者アカウント：
 - **Email**: info@sinjapan.jp
@@ -111,11 +155,41 @@ postgresql://username:password@hostname:port/database_name?schema=public
 
 ## 🔍 トラブルシューティング
 
-### 403 Forbidden エラーの解決
+### 403 Forbidden エラーの解決（重要！）
 
-403エラーが発生する場合、以下の手順を確認してください：
+403エラーが発生する場合、以下の手順を**順番に**確認してください：
 
-#### 1. アプリケーションの起動確認
+#### ⚠️ 最も重要な確認事項（まずこれを確認！）
+
+1. **アプリケーションが起動しているか確認**
+   - Hostingerのダッシュボードで、アプリケーションのステータスを確認
+   - 「実行中」または「Running」になっているか確認
+   - 停止している場合は、「起動」ボタンをクリック
+
+2. **ログの確認（最重要）**
+   - Hostingerの「ログ」または「Logs」タブを開く
+   - アプリケーションログとビルドログを確認
+   - エラーメッセージがないか確認
+   - よくあるエラー：
+     - `EADDRINUSE`: ポートが使用中（環境変数`PORT`を確認）
+     - `Cannot find module`: 依存関係が不足（`npm install`が必要）
+     - `Prisma Client is not generated`: Prismaクライアントが生成されていない（`npm run prisma:generate`が必要）
+
+3. **環境変数の確認**
+   - Hostingerの環境変数設定で、以下がすべて設定されているか確認：
+     - `DATABASE_URL` ✅
+     - `JWT_SECRET` ✅
+     - `NEXTAUTH_URL` ✅（`https://sinjapan-logimatch.com`）
+     - `PORT` ✅（通常は自動設定、明示的に設定する場合は`5000`など）
+
+4. **ビルドとスタートコマンドの確認**
+   - **Build Command**: `npm run build` ✅
+   - **Start Command**: `npm start` ✅
+   - **Node.js Version**: 18.x または 20.x ✅
+
+#### 詳細なトラブルシューティング
+
+##### 1. アプリケーションの起動確認
 - Hostingerのアプリケーション管理画面で、アプリケーションが正常に起動しているか確認
 - ログビューアーでエラーメッセージを確認
 
@@ -143,9 +217,11 @@ postgresql://username:password@hostname:port/database_name?schema=public
 - ディレクトリの権限を確認：`ls -la`
 - 必要に応じて権限を修正：`chmod 755 .`
 
-#### 6. `.htaccess`ファイル
-- プロジェクトルートに`.htaccess`ファイルが存在するか確認
-- Apacheを使用している場合、このファイルがルーティングを処理します
+#### 6. `.htaccess`ファイルについて
+⚠️ **注意**: HostingerのNode.js環境では、`.htaccess`ファイルは通常使用されません。
+- Node.jsアプリケーションは直接起動するため、Apacheの`.htaccess`は適用されません
+- 403エラーの原因は通常、アプリケーションが起動していない、またはポート設定の問題です
+- まず、上記の1-5を確認してください
 
 #### 7. 環境変数の再確認
 以下がすべて設定されているか確認：
